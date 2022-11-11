@@ -1,9 +1,9 @@
 import {app, BrowserWindow, dialog} from 'electron';
 import {ipcMain} from 'electron/main';
 import * as path from 'path';
+import {IJsonCsvData} from './types';
+import {createCsv} from './script/index';
 import parseCsv from './utils/parseCsv';
-import {IJsonCsvData} from './utils/types';
-import {createCsv} from './utils/script/index';
 
 function createWindow() {
   // Create the browser window.

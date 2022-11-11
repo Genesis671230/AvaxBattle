@@ -17,7 +17,7 @@ export default async function <T>(filePathWithName: string): Promise<T[]> {
       return resolve(result);
     });
 
-    stream.on('error', (err: any) => {
+    stream.on('error', (err: unknown) => {
       console.error(err);
       return reject(err);
     });

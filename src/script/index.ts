@@ -1,20 +1,20 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-import { clusterApiUrl, Connection, PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { createObjectCsvWriter } from "csv-writer";
-import { csvHeaders } from "../constants";
+import { csvHeaders, solanaRpcEndPoint } from "../constants/index";
 import { createCsvObject } from "../factory";
 import { IAllowedArguments, IJsonCsvData } from "../types";
 import { getSignaturesByTime } from "../utils/getSignatures";
 import fs from "fs";
+import { IInstruction } from "../types/index";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Alert = require("electron-alert");
 
 export const createCsv = async (
   params: IAllowedArguments,
   jsonCsvData: IJsonCsvData[]
-): Promise<any> => {
+): Promise<string> => {
   const { endDate, pullDataBy, pullDataByValue, startDate, symbol } = params;
+
   if (Date.parse(String(endDate)) < Date.parse(String(startDate))) {
     const swalOptions = {
       position: "top-end",
@@ -36,22 +36,9 @@ export const createCsv = async (
   } else {
     address_ = pullDataByValue as unknown as PublicKey;
   }
-  fs.unlink("output.csv", function (err) {
-    if (err && err.code == "ENOENT") {
-      // file doens't exist
-      console.info("File doesn't exist, won't remove it.");
-    } else if (err) {
-      // other errors, e.g. maybe we don't have enough permission
-      console.error("Error occurred while trying to remove file");
-    } else {
-      console.info(`removed`);
-    }
-  });
-  console.log("address_", address_);
 
   if (pullDataBy === "tag" || pullDataBy === "group") {
-    //@ts-ignore
-    if (address_.length === 0) {
+    if (Array.isArray(address_) && address_.length === 0) {
       const swalOptions = {
         position: "top-end",
         title: "Invalid Group or Tag",
@@ -64,11 +51,17 @@ export const createCsv = async (
       return;
     }
   }
-  // @TODO replace the below with the provied rpc end point
-  // const solanaClient = new Connection(clusterApiUrl("mainnet-beta"));
-  const solanaClient = new Connection(
-    "https://winter-powerful-grass.solana-mainnet.discover.quiknode.pro/c345c5ce167f0bb90a02987a43d0437fb8bca37e/"
-  );
+  fs.unlink("output.csv", function (err) {
+    if (err && err.code == "ENOENT") {
+      console.info("File doesn't exist, won't remove it.");
+    } else if (err) {
+      console.error("Error occurred while trying to remove file");
+    } else {
+      console.info(`removed`);
+    }
+  });
+
+  const solanaClient = new Connection(solanaRpcEndPoint);
 
   const csvData = [];
   if (Array.isArray(address_)) {
@@ -114,16 +107,15 @@ export const createCsv = async (
         if (transactionDetails?.transaction.message.instructions) {
           let index = 0;
           mainLoop: for (const instruction of transactionDetails?.transaction
-            .message.instructions) {
+            .message.instructions as unknown as Array<IInstruction>) {
             let feeShown = false;
             if (transactionDetails.meta?.innerInstructions) {
               for (const innerTransaction of transactionDetails.meta
                 ?.innerInstructions) {
                 if (index === innerTransaction.index) {
                   let innerIndex = 0;
-                  for (const instruction of innerTransaction.instructions) {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const { parsed } = instruction as any;
+                  for (const instruction of innerTransaction.instructions as unknown as Array<IInstruction>) {
+                    const { parsed } = instruction;
 
                     innerIndex++;
                     const number = `${
@@ -135,7 +127,6 @@ export const createCsv = async (
                         (parsed.type === "transfer" ||
                           parsed.type === "createAccount" ||
                           parsed.type === "mintTo")) ||
-                      //@ts-ignore
                       (instruction.program === "system" && parsed.info.lamports)
                     ) {
                       const csvRowObject = await createCsvObject(
@@ -168,17 +159,14 @@ export const createCsv = async (
               }
             }
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { parsed } = instruction as any;
+            const { parsed } = instruction;
             if (
               (parsed &&
                 (parsed.type === "transfer" ||
                   parsed.type === "createAccount" ||
                   parsed.type === "transferChecked" ||
                   parsed.type === "mintTo")) ||
-              //@ts-ignore
               (instruction.program === "system" && parsed.info.lamports) ||
-              //@ts-ignore
               (instruction.program === "spl-token" &&
                 (parsed.info.amount || parsed.info.tokenAmount))
             ) {
@@ -241,15 +229,14 @@ export const createCsv = async (
           let index = 0;
           let feeShown = false;
           mainLoop: for (const instruction of transactionDetails?.transaction
-            .message.instructions) {
+            .message.instructions as unknown as Array<IInstruction>) {
             if (transactionDetails.meta?.innerInstructions) {
               for (const innerTransaction of transactionDetails.meta
-                ?.innerInstructions) {
+                ?.innerInstructions as unknown as Array<IInstruction>) {
                 if (index === innerTransaction.index) {
                   let innerIndex = 0;
-                  for (const instruction of innerTransaction.instructions) {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const { parsed } = instruction as any;
+                  for (const instruction of innerTransaction.instructions as unknown as Array<IInstruction>) {
+                    const { parsed } = instruction;
 
                     innerIndex++;
                     const number = `${
@@ -261,7 +248,6 @@ export const createCsv = async (
                         (parsed.type === "transfer" ||
                           parsed.type === "createAccount" ||
                           parsed.type === "mintTo")) ||
-                      //@ts-ignore
                       (instruction.program === "system" && parsed.info.lamports)
                     ) {
                       const csvRowObject = await createCsvObject(
@@ -289,17 +275,14 @@ export const createCsv = async (
               }
             }
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const { parsed } = instruction as any;
+            const { parsed } = instruction as unknown as IInstruction;
             if (
               (parsed &&
                 (parsed.type === "transfer" ||
                   parsed.type === "createAccount" ||
                   parsed.type === "transferChecked" ||
                   parsed.type === "mintTo")) ||
-              //@ts-ignore
               (instruction.program === "system" && parsed.info.lamports) ||
-              //@ts-ignore
               (instruction.program === "spl-token" &&
                 (parsed.info.amount || parsed.info.tokenAmount))
             ) {
@@ -333,14 +316,17 @@ export const createCsv = async (
   });
   let csvData_;
   if (symbol === "mbs") {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     //@ts-ignore
     csvData_ = csvData.filter((data) => data.token_symbol === "MBS");
   } else if (symbol === "sol") {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     //@ts-ignore
     csvData_ = csvData.filter((data) => data.token_symbol === "SOL");
   } else {
     csvData_ = csvData;
   }
+
   await csvWriter.writeRecords(csvData_);
   const swalOptions = {
     position: "top-end",

@@ -1,10 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-export const getMint = (instruction: {
-  program?: any;
-  parsed?: any;
-}): string | undefined => {
+import { IInstruction } from "../types";
+
+export const getMint = (instruction: IInstruction): string | undefined => {
   const { parsed } = instruction;
-  console.log("instruction", instruction.program);
   let mint = "";
   if (
     parsed &&
@@ -15,7 +12,8 @@ export const getMint = (instruction: {
     mint = parsed.info.mint || parsed.info.tokenAddress;
     return mint;
   }
-
+  console.log("instruction program",instruction.program);
+  
   if (instruction.program === "spl-token") {
     mint = parsed.info.destination || parsed.info.source;
     return mint;

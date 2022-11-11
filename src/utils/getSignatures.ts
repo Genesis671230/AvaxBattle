@@ -6,7 +6,7 @@ import {
 } from "@solana/web3.js";
 
 const data: string[] = [];
-const LIMIT = 200;
+const LIMIT = 900;
 let fromDate = 0;
 let toDate = 0;
 let solanaClient: Connection;
@@ -19,10 +19,6 @@ export const getSignaturesByTime = async (
 ): Promise<string[]> => {
   fromDate = fromDate_;
   toDate = toDate_;
-  console.log("fromDate", fromDate);
-  console.log("toDate", toDate);
-  console.log("address", address);
-
   solanaClient = solanaClient_;
   let i = 0;
   let oldestSignature = "";
@@ -31,10 +27,10 @@ export const getSignaturesByTime = async (
     i = result.value;
     oldestSignature = result?.returnSignature;
   }
-  console.log("data", data);
 
   return data;
 };
+
 
 const getSignatures = async (
   oldestSignature: string,
@@ -56,10 +52,8 @@ const getSignatures = async (
   const count = signatures.length;
 
   oldestSignature = signatures[count - 1]?.signature;
-  console.log("signatures", signatures);
   signatures.forEach((sig) => {
     if (sig.blockTime && sig.blockTime >= fromDate && sig.blockTime <= toDate) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       data.push(sig?.signature);
     }
   });

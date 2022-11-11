@@ -1,19 +1,17 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Connection, PublicKey } from "@solana/web3.js";
 import axios from "axios";
-import { getMint } from "../utils";
-import { isSolTransfer } from "../utils/isSolTransfer";
+import { getMint } from "../utils/";
+import { isSolTransfer } from "../utils/";
 import { getAmountDirection } from "../utils/getAmountDirection";
+import { IInstruction } from "../types";
 export async function createCsvObject(
-  instruction: any,
+  instruction: IInstruction,
   solanaClient: Connection,
   feePayer: string | undefined,
   signer: string | undefined,
   fee = "",
   feeAlreadyShown = false
-): Promise<Record<any, any>> {
+): Promise<Record<string, string | number | undefined>> {
   const { parsed } = instruction;
   const isSol = isSolTransfer(instruction);
   const mint = getMint(instruction);
@@ -38,22 +36,24 @@ export async function createCsvObject(
   const destination =
     !isSol &&
     instruction.parsed?.info?.destination &&
-    (await //@ts-ignore
+    (await // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     (
       await solanaClient.getParsedAccountInfo(
         new PublicKey(instruction.parsed.info.destination)
         )
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
     )?.value?.data?.parsed?.info?.owner);
 
   const source =
     !isSol &&
     instruction.parsed?.info?.source &&
-    (await //@ts-ignore
+    (await 
     (
       await solanaClient.getParsedAccountInfo(
         new PublicKey(instruction.parsed.info.source)
         )
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
     )?.value?.data?.parsed?.info?.owner);
 
@@ -62,23 +62,14 @@ export async function createCsvObject(
     instruction,
     metadata,
     signer,
-    destination,
-    source
+    isSol
+      ? instruction.parsed?.info?.destination &&
+          instruction.parsed?.info?.destination
+      : destination,
+    isSol
+      ? instruction.parsed?.info?.source && instruction.parsed?.info?.source
+      : source
   );
-  console.log("fee check",feeAlreadyShown);
-  console.log(
-    "fee",
-    !feeAlreadyShown
-      ? feePayer === signer
-        ? `-${fee}`
-        : ""
-      : feePayer === signer &&
-        parsed.type !== "transfer" &&
-        parsed.info["lamports"]
-      ? `-${parsed.info.lamports / 1e9}`
-      : ""
-  );
-
   return {
     source: (source && source) || parsed?.info.source || "",
     destination: (destination && destination) || parsed?.info.destination || "",
