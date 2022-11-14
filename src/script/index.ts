@@ -1,11 +1,22 @@
-import { Connection, PublicKey } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import { createObjectCsvWriter } from "csv-writer";
-import { csvHeaders, solanaRpcEndPoint } from "../constants/index";
+import {
+  csvHeaders,
+  promiseConcurrency,
+  tranasctionTypeToProcess,
+} from "../constants/index";
 import { createCsvObject } from "../factory";
-import { IAllowedArguments, IJsonCsvData } from "../types";
+import {
+  IAllowedArguments,
+  IJsonCsvData,
+  IParsedTransactionMapperWithSignature,
+} from "../types";
 import { getSignaturesByTime } from "../utils/getSignatures";
 import fs from "fs";
 import { IInstruction } from "../types/index";
+import { solanaClient } from "../config";
+import { getTransactionsMapper, useMemoToken } from "../utils";
+import promiseWithConcurrency from "..//utils/promiseAllConcurrency";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Alert = require("electron-alert");
 
@@ -61,37 +72,40 @@ export const createCsv = async (
     }
   });
 
-  const solanaClient = new Connection(solanaRpcEndPoint);
-
   const csvData = [];
   if (Array.isArray(address_)) {
     const transactionsByAddress: Array<string> = [];
-    for (const address of address_) {
-      transactionsByAddress.push(
-        ...(await getSignaturesByTime(
-          Date.parse(String(startDate)) / 1000,
-          Date.parse(String(endDate)) / 1000,
-          solanaClient,
-          address.address
-        ))
-      );
-    }
-    console.log("transactions", transactionsByAddress);
+    await promiseWithConcurrency(
+      address_,
+      async (address) => {
+        transactionsByAddress.push(
+          ...(await getSignaturesByTime(
+            Date.parse(String(startDate)) / 1000,
+            Date.parse(String(endDate)) / 1000,
+            solanaClient,
+            address.address
+          ))
+        );
+      },
+      { concurrency: promiseConcurrency }
+    );
+    console.log("transactionsByAddress", transactionsByAddress);
 
-    if (transactionsByAddress) {
+    if (transactionsByAddress.length !== 0) {
       const group = address_[0].group;
       const tags = address_[0].tags;
       const device = address_[0].device;
       const ownWallet = address_[0].own_wallet;
       const counterOwnWallet = address_[0].own_wallet === "TRUE";
-      for (const transaction of transactionsByAddress) {
-        const transactionDetails = await solanaClient.getParsedTransaction(
-          transaction as string
-        );
-        console.log("transaction", transaction);
-
+      const transactionsDetailsArray = await promiseWithConcurrency(
+        transactionsByAddress,
+        getTransactionsMapper,
+        { concurrency: promiseConcurrency }
+      );
+      for (const transactionDetailsWithSignatues of transactionsDetailsArray as Array<IParsedTransactionMapperWithSignature>) {
+        const { signature, transactionDetails } =
+          transactionDetailsWithSignatues;
         const signer = transactionDetails?.transaction.signatures[0];
-        const signature = transaction;
         const feePayer =
           transactionDetails?.transaction.message.accountKeys[0].pubkey.toString();
         const dateTime =
@@ -103,7 +117,7 @@ export const createCsv = async (
         const dateTimeArray = String(dateTime)?.split(",");
         const fee =
           transactionDetails?.meta?.fee && transactionDetails.meta.fee / 1e9;
-        const tx_link = `https://solscan.io/tx/${transaction}`;
+        const tx_link = `https://solscan.io/tx/${signature}`;
         if (transactionDetails?.transaction.message.instructions) {
           let index = 0;
           mainLoop: for (const instruction of transactionDetails?.transaction
@@ -123,11 +137,10 @@ export const createCsv = async (
                     }.${innerIndex}`;
 
                     if (
-                      (parsed &&
-                        (parsed.type === "transfer" ||
-                          parsed.type === "createAccount" ||
-                          parsed.type === "mintTo")) ||
-                      (instruction.program === "system" && parsed.info.lamports)
+                      parsed &&
+                      (tranasctionTypeToProcess.has(parsed.type) ||
+                        (instruction.program === "system" &&
+                          parsed.info.lamports))
                     ) {
                       const csvRowObject = await createCsvObject(
                         instruction,
@@ -160,15 +173,13 @@ export const createCsv = async (
             }
 
             const { parsed } = instruction;
+            console.log("parsed", parsed);
             if (
-              (parsed &&
-                (parsed.type === "transfer" ||
-                  parsed.type === "createAccount" ||
-                  parsed.type === "transferChecked" ||
-                  parsed.type === "mintTo")) ||
-              (instruction.program === "system" && parsed.info.lamports) ||
-              (instruction.program === "spl-token" &&
-                (parsed.info.amount || parsed.info.tokenAmount))
+              parsed &&
+              (tranasctionTypeToProcess.has(parsed.type) ||
+                (instruction.program === "system" && parsed.info.lamports) ||
+                (instruction.program === "spl-token" &&
+                  (parsed.info.amount || parsed.info.tokenAmount)))
             ) {
               const csvRowObject = await createCsvObject(
                 instruction,
@@ -201,16 +212,20 @@ export const createCsv = async (
       address_
     );
 
-    if (transactionsByAddress) {
-      for (const transaction of transactionsByAddress) {
-        const transactionDetails = await solanaClient.getParsedTransaction(
-          transaction as string
-        );
+    if (transactionsByAddress.length !== 0) {
+      const transactionsDetailsArray = await promiseWithConcurrency(
+        transactionsByAddress,
+        getTransactionsMapper,
+        { concurrency: promiseConcurrency }
+      );
+      for (const transactionDetailsWithSignatures of transactionsDetailsArray as Array<IParsedTransactionMapperWithSignature>) {
+        const { signature, transactionDetails } =
+          transactionDetailsWithSignatures;
         const signer =
           transactionDetails?.transaction.signatures.find(
-            (e) => e === String(address_)
+            (e: string) => e === String(address_)
           ) || address_;
-        const signature = transaction;
+
         const feePayer =
           transactionDetails?.transaction.message.accountKeys[0].pubkey.toString();
         const dateTime =
@@ -222,9 +237,8 @@ export const createCsv = async (
         const dateTimeArray = String(dateTime)?.split(",");
         const fee =
           transactionDetails?.meta?.fee && transactionDetails.meta.fee / 1e9;
-        console.log("fee", fee);
 
-        const tx_link = `https://solscan.io/tx/${transaction}`;
+        const tx_link = `https://solscan.io/tx/${signature}`;
         if (transactionDetails?.transaction.message.instructions) {
           let index = 0;
           let feeShown = false;
@@ -242,13 +256,13 @@ export const createCsv = async (
                     const number = `${
                       innerTransaction.index + 1
                     }.${innerIndex}`;
+                    console.log("parsed", parsed);
 
                     if (
-                      (parsed &&
-                        (parsed.type === "transfer" ||
-                          parsed.type === "createAccount" ||
-                          parsed.type === "mintTo")) ||
-                      (instruction.program === "system" && parsed.info.lamports)
+                      parsed &&
+                      (tranasctionTypeToProcess.has(parsed.type) ||
+                        (instruction.program === "system" &&
+                          parsed.info.lamports))
                     ) {
                       const csvRowObject = await createCsvObject(
                         instruction,
@@ -276,15 +290,13 @@ export const createCsv = async (
             }
 
             const { parsed } = instruction as unknown as IInstruction;
+            console.log("parsed", parsed);
             if (
-              (parsed &&
-                (parsed.type === "transfer" ||
-                  parsed.type === "createAccount" ||
-                  parsed.type === "transferChecked" ||
-                  parsed.type === "mintTo")) ||
-              (instruction.program === "system" && parsed.info.lamports) ||
-              (instruction.program === "spl-token" &&
-                (parsed.info.amount || parsed.info.tokenAmount))
+              parsed &&
+              (tranasctionTypeToProcess.has(parsed.type) ||
+                (instruction.program === "system" && parsed.info.lamports) ||
+                (instruction.program === "spl-token" &&
+                  (parsed.info.amount || parsed.info.tokenAmount)))
             ) {
               const csvRowObject = await createCsvObject(
                 instruction,
@@ -337,5 +349,6 @@ export const createCsv = async (
   };
 
   Alert.fireToast(swalOptions);
+  await useMemoToken("", true);
   return "Output file generated";
 };

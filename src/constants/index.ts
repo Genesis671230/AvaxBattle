@@ -1,6 +1,7 @@
 import { ICsvHeader } from "../types";
 
-const solanaRpcEndPoint ="https://winter-powerful-grass.solana-mainnet.discover.quiknode.pro/c345c5ce167f0bb90a02987a43d0437fb8bca37e/";
+const solanaRpcEndPoint =
+  "https://winter-powerful-grass.solana-mainnet.discover.quiknode.pro/c345c5ce167f0bb90a02987a43d0437fb8bca37e/";
 
 const csvHeaders: ICsvHeader[] = [
   { id: "date", title: "Date" },
@@ -33,4 +34,20 @@ const csvHeaders: ICsvHeader[] = [
   { id: "payment_to_provider", title: "Payment to provider" },
 ];
 
-export { solanaRpcEndPoint, csvHeaders };
+const tranasctionTypeToProcess = new Set([
+  "transfer",
+  "transferChecked",
+  "mintTo",
+  "mintChecked",
+  "burn",
+  "burnChecked",
+]);
+
+const promiseConcurrency = 5;
+
+export {
+  solanaRpcEndPoint,
+  csvHeaders,
+  tranasctionTypeToProcess,
+  promiseConcurrency,
+};

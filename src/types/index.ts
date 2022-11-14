@@ -37,12 +37,28 @@ export interface IInstruction extends ParsedTransactionWithMeta {
       mint: string;
       source: string;
       destination: string;
-      tokenAmount: Record<string, string|number>;
+      tokenAmount: Record<string, string | number>;
       amount: number;
       lamports: number;
     };
     source: string | undefined;
     destination: string | undefined;
   };
-  program:string | undefined
+  program: string | undefined;
+}
+
+export interface ITokenMetaData {
+  tokenAddress?: string;
+  name: string;
+  symbol?: string;
+  decimals: string | number;
+  tokenAuthority: string;
+  supply: string;
+  type: string;
+  tokenAmount?: { decimals: number };
+}
+
+export interface IParsedTransactionMapperWithSignature {
+  transactionDetails: IInstruction;
+  signature: string;
 }

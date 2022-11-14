@@ -1,22 +1,19 @@
-import { IInstruction } from "../types/index";
+import { tranasctionTypeToProcess } from "../constants";
+import { IInstruction, ITokenMetaData } from "../types/index";
 export const getAmountDirection = (
   isSol: boolean,
   instruction: IInstruction,
-  metadata: { tokenAmount: { decimals: number } },
+  metadata: ITokenMetaData,
   signer: string | undefined,
   destination: string | undefined,
   source: string | undefined
 ): string | number => {
   let amountDirection;
-  console.log("destination", destination);
-  console.log("source", source);
-  console.log("signer", signer);
-
   if (!isSol) {
     amountDirection =
       signer === destination &&
-      (instruction.parsed.type === "transfer" ||
-        instruction.type === "transferChecked")
+      (tranasctionTypeToProcess.has(instruction.parsed.type) ||
+        tranasctionTypeToProcess.has(instruction.type))
         ? metadata?.tokenAmount?.decimals
           ? Number(instruction.parsed.info.amount) /
             Number(`1e${metadata?.tokenAmount?.decimals}`)
@@ -25,8 +22,8 @@ export const getAmountDirection = (
           : instruction.parsed.info.amount ||
             instruction.parsed.info.lamports / 1e9
         : signer === source &&
-          (instruction.parsed.type === "transfer" ||
-            instruction.type === "transferChecked")
+          (tranasctionTypeToProcess.has(instruction.parsed.type) ||
+            tranasctionTypeToProcess.has(instruction.type))
         ? `-${
             metadata?.tokenAmount?.decimals
               ? instruction.parsed.info.amount /
@@ -36,8 +33,8 @@ export const getAmountDirection = (
               : instruction.parsed.info.amount ||
                 instruction.parsed.info.lamports / 1e9
           }`
-        : instruction.parsed.type === "transfer" ||
-          instruction.type === "transferChecked"
+        : tranasctionTypeToProcess.has(instruction.parsed.type) ||
+          tranasctionTypeToProcess.has(instruction.type)
         ? metadata?.tokenAmount?.decimals
           ? instruction.parsed.info.amount /
             Number(`1e${metadata.tokenAmount.decimals}`)
@@ -50,23 +47,26 @@ export const getAmountDirection = (
     amountDirection =
       instruction.parsed.info.source &&
       instruction.parsed.info.source === signer &&
-      instruction.parsed.type === "transfer"
+      (tranasctionTypeToProcess.has(instruction.parsed.type) ||
+        tranasctionTypeToProcess.has(instruction.type))
         ? `-${
             metadata?.tokenAmount?.decimals
-              ? instruction.parsed.info.amount /
+              ? instruction?.parsed?.info?.amount /
                 Number(`1e${metadata?.tokenAmount?.decimals}`)
-              : instruction.parsed.info.amount ||
-                instruction.parsed.info.lamports / 1e9
+              : instruction?.parsed?.info?.amount ||
+                instruction?.parsed?.info?.lamports / 1e9
           }`
         : instruction.parsed.info.destination &&
           instruction.parsed.info.destination === signer &&
-          instruction.parsed.type === "transfer"
+          (tranasctionTypeToProcess.has(instruction.parsed.type) ||
+            tranasctionTypeToProcess.has(instruction.type))
         ? metadata?.tokenAmount?.decimals
-          ? instruction.parsed.info.amount /
+          ? instruction.parsed?.info?.amount /
             Number(`1e${metadata?.tokenAmount?.decimals}`)
-          : instruction.parsed.info.amount ||
-            instruction.parsed.info.lamports / 1e9
-        : instruction.parsed.type === "transfer"
+          : instruction.parsed?.info?.amount ||
+            instruction.parsed?.info?.lamports / 1e9
+        : tranasctionTypeToProcess.has(instruction.parsed.type) ||
+          tranasctionTypeToProcess.has(instruction.type)
         ? metadata?.tokenAmount?.decimals
           ? instruction.parsed.info.amount /
             Number(`1e${metadata?.tokenAmount?.decimals}`)

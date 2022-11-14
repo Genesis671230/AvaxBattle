@@ -163,7 +163,7 @@ body {
 
 .file-input-label {
 	display: block;
-	width: 60vw;
+	width: 100%;
 	max-width: 300px;
 	margin: 0 auto;
 	background-color: slateblue;

@@ -1,9 +1,10 @@
 import { Connection, PublicKey } from "@solana/web3.js";
-import axios from "axios";
-import { getMint } from "../utils/";
+import { getMint, useMemoToken } from "../utils/";
 import { isSolTransfer } from "../utils/";
 import { getAmountDirection } from "../utils/getAmountDirection";
 import { IInstruction } from "../types";
+import { tranasctionTypeToProcess } from "../constants";
+
 export async function createCsvObject(
   instruction: IInstruction,
   solanaClient: Connection,
@@ -14,29 +15,20 @@ export async function createCsvObject(
 ): Promise<Record<string, string | number | undefined>> {
   const { parsed } = instruction;
   const isSol = isSolTransfer(instruction);
-  const mint = getMint(instruction);
   let metadata;
   if (!isSol) {
-    metadata =
-      mint &&
-      (
-        await axios.get(
-          `https://public-api.solscan.io/token/meta?tokenAddress=${mint}`
-        )
-      ).data;
-    if (!metadata?.symbol && metadata?.tokenAddress) {
-      metadata = (
-        await axios.get(
-          `https://public-api.solscan.io/token/meta?tokenAddress=${metadata.tokenAddress}`
-        )
-      )?.data;
+    try {
+     
+      const mint = getMint(instruction);
+      metadata = await useMemoToken(mint);
+    } catch (error) {
+      console.log("request failed for meta data with error", error);
     }
-    console.log("metadata", metadata);
   }
   const destination =
     !isSol &&
     instruction.parsed?.info?.destination &&
-    (await // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    (await 
     (
       await solanaClient.getParsedAccountInfo(
         new PublicKey(instruction.parsed.info.destination)
@@ -55,7 +47,7 @@ export async function createCsvObject(
         )
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         //@ts-ignore
-    )?.value?.data?.parsed?.info?.owner);
+        )?.value?.data?.parsed?.info?.owner);
 
   const amountDirection = getAmountDirection(
     isSol,
@@ -75,27 +67,27 @@ export async function createCsvObject(
     destination: (destination && destination) || parsed?.info.destination || "",
     source_token_account: isSol
       ? ""
-      : parsed.type === "transferChecked" || parsed.type === "transfer"
-      ? parsed.info.source
+      : tranasctionTypeToProcess.has(parsed.type)
+      ? parsed.info?.source
       : "",
     destination_token_account: isSol
       ? ""
-      : parsed.type === "transferChecked" || parsed.type === "transfer"
-      ? parsed.info.destination
+      : tranasctionTypeToProcess.has(parsed.type)
+      ? parsed.info?.destination
       : "",
     amount:
-      parsed.type === "transfer"
+    tranasctionTypeToProcess.has(parsed.type) 
         ? parsed.info["amount"]
           ? metadata?.tokenAmount?.decimals
             ? parsed.info.amount / Number(`1e${metadata.tokenAmount.decimals}`)
             : parsed.info.amount
           : parsed.info?.lamports && parsed.info?.lamports / 1e9
-        : parsed.type === "transferChecked" &&
+        : tranasctionTypeToProcess.has(parsed.type) &&
           instruction.program === "spl-token"
         ? parsed.info?.tokenAmount?.uiAmountString || parsed.info.amount
         : "",
     token_symbol: isSol ? "SOL" : metadata?.symbol || "",
-    token_mint: isSol ? "" : parsed.info.mint || "",
+    token_mint: isSol ? "" : parsed.info?.mint || "",
     queried_address: signer,
     counter_address: destination || "",
     amount_direction: amountDirection || "",
@@ -104,7 +96,7 @@ export async function createCsvObject(
         ? `-${fee}`
         : ""
       : feePayer === signer &&
-        parsed.type !== "transfer" &&
+      !tranasctionTypeToProcess.has(parsed.type) &&
         parsed.info["lamports"]
       ? `-${parsed.info.lamports / 1e9}`
       : "",
